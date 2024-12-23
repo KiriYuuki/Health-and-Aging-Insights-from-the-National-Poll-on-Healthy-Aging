@@ -1,0 +1,657 @@
+---
+title: "Health and Aging: Insights from the National Poll on Healthy Aging"
+author: "Yuanda Krisna"
+date: "6 July 2024"
+output: 
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+# Introduction
+
+The National Poll on Healthy Aging (NPHA), led by the University of Michigan, serves as a vital source of data on health and healthcare challenges affecting Americans aged 50 and older. The dataset draws on surveys from older adults and their caregivers, capturing diverse perspectives on topics such as health insurance coverage, sleep problems, dental care, prescription drug use, and caregiving responsibilities. By examining these aspects, this report aims to shed light on the health needs and policy concerns surrounding the aging population, contributing to better-informed public health initiatives, healthcare services, and policymaking efforts that support older adults in the U.S. 
+
+# Data Preparation
+
+## Prerequisites
+
+### Importing Libraries
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(plotly)
+library(scales)
+library(ggrepel)
+```
+
+```{r}
+# Load the dataset
+healthyaging <- read.csv("data_input/NPHA-doctor-visits.csv")
+# View the first few rows of the dataset
+print(healthyaging)
+```
+
+To begin the analysis, we first load the necessary libraries for data manipulation and visualization. The ggplot2 package is used for plotting, dplyr for data wrangling, readr for reading the dataset, plotly for interactive visualizations, scales for formatting, and ggrepel for clear labeling of points on plots. The NPHA dataset is loaded and initially inspected, consisting of multiple variables capturing respondents' healthcare habits, health status, and other relevant characteristics.
+
+**Data Overview and Structure**:
+
+The dataset is drawn from the National Poll on Healthy Aging, encompassing health-related insights for Americans aged 50 and older. It contains key health indicators across multiple domains such as physical and mental health, dental care, and sleep issues. Each respondent's experience is captured through various categorical variables that represent their self-assessed health status, employment, stress, and medication impact on sleep, and the number of doctors they have visited.
+
+```{r}
+colnames(healthyaging)
+```
+
+#### Variables Description
+
+1. **Doctors Visited**: 
+
+Categorical target variable representing how many different doctors a patient has seen, categorized into *three levels: 0-1 doctors, 2-3 doctors, or 4 or more doctors*.
+
+2. **Age Group**: 
+
+Categorical feature representing the patient's age group: *either 50-64 or 65-80 years old*.
+
+3. **Physical Health**: 
+
+Categorical feature representing the patient's self-assessed physical health, ranging from *Excellent, Very Good, Good, Fair, to Poor*.
+
+4, **Mental Health**: 
+
+Categorical feature representing the patient's self-assessed mental health on a scale from *Excellent to Poor*.
+
+5. **Dental Health**: 
+
+Categorical feature representing the patient's self-assessed dental health, ranging from *Excellent to Poor*.
+
+6. **Employment Status**: 
+
+Categorical feature describing the patient's employment status, which could be *Working full-time, Working part-time, Retired, or Not working at this time*.
+
+7. **Stress Impact**: 
+
+Categorical feature indicating whether stress affects the patient's ability to sleep *(Yes or No)*.
+
+8. **Medication Impact**: 
+
+Categorical feature indicating whether medication affects the patient's sleep *(Yes or No)*.
+
+9. **Pain Impact**: 
+
+Categorical feature indicating whether pain affects the patient's sleep *(Yes or No)*.
+
+10. **Bathroom Needs Impact**: 
+
+Categorical feature indicating whether bathroom needs disturb the patient's sleep *(Yes or No)*.
+
+11. **Unknown Impact**: 
+
+Categorical feature indicating whether unknown factors impact the patient's sleep *(Yes or No)*.
+
+12. **Trouble Sleeping**: 
+
+Categorical feature indicating whether the patient has trouble sleeping in general *(Yes or No)*.
+
+13. **Prescription Medication**: 
+
+Categorical feature that represents the patient's usage of prescription sleep medication, categorized as *Use regularly, Use occasionally, or Do not use*.
+
+14. **Race Ethnicity**: 
+
+Categorical feature describing the patient's racial or ethnic background, such as *White, Non-Hispanic, Black, Non-Hispanic, Hispanic, or 2+ Races, Non-Hispanic*.
+
+15. **Gender**: 
+
+Categorical feature representing the patient's gender identity, either *Male or Female*.
+
+## Data Pre-Processing
+
+```{r}
+healthyaging_clean <- healthyaging %>%
+  rename(
+    "Doctors Visited" = Number.of.Doctors.Visited,
+    "Age Group" = Age,
+    "Physical Health" = Phyiscal.Health,  # Fixed typo here
+    "Mental Health" = Mental.Health,
+    "Dental Health" = Dental.Health,
+    "Employment Status" = Employment,
+    "Stress Impact" = Stress.Keeps.Patient.from.Sleeping,
+    "Medication Impact" = Medication.Keeps.Patient.from.Sleeping,
+    "Pain Impact" = Pain.Keeps.Patient.from.Sleeping,
+    "Bathroom Needs Impact" = Bathroom.Needs.Keeps.Patient.from.Sleeping,
+    "Unknown Impact" = Uknown.Keeps.Patient.from.Sleeping,  # Fixed typo here
+    "Trouble Sleeping" = Trouble.Sleeping,
+    "Prescription Medication" = Prescription.Sleep.Medication,
+    "Race Ethnicity" = Race,
+    "Gender" = Gender
+  )
+```
+
+```{r}
+healthyaging_clean <- healthyaging %>%
+  mutate(
+    `Doctors Visited` = factor(Number.of.Doctors.Visited,
+                               levels = c(1, 2, 3),
+                               labels = c("0-1 doctors", "2-3 doctors", "4 or more doctors")),
+    `Age Group` = factor(Age, levels = c(1, 2), labels = c("50-64", "65-80")),
+    `Physical Health` = factor(Phyiscal.Health,
+                               levels = c(-1, 1, 2, 3, 4, 5),
+                               labels = c("Refused", "Excellent", "Very Good", "Good", "Fair", "Poor")),
+    `Mental Health` = factor(Mental.Health,
+                             levels = c(-1, 1, 2, 3, 4, 5),
+                             labels = c("Refused", "Excellent", "Very Good", "Good", "Fair", "Poor")),
+    `Dental Health` = factor(Dental.Health,
+                             levels = c(-1, 1, 2, 3, 4, 5),
+                             labels = c("Refused", "Excellent", "Very Good", "Good", "Fair", "Poor")),
+    `Employment Status` = factor(Employment,
+                                 levels = c(-1, 1, 2, 3, 4),
+                                 labels = c("Refused", "Working full-time", "Working part-time", "Retired", "Not working at this time")),
+    `Stress Impact` = factor(Stress.Keeps.Patient.from.Sleeping, levels = c(0, 1), labels = c("No", "Yes")),
+    `Medication Impact` = factor(Medication.Keeps.Patient.from.Sleeping, levels = c(0, 1), labels = c("No", "Yes")),
+    `Pain Impact` = factor(Pain.Keeps.Patient.from.Sleeping, levels = c(0, 1), labels = c("No", "Yes")),
+    `Bathroom Needs Impact` = factor(Bathroom.Needs.Keeps.Patient.from.Sleeping, levels = c(0, 1), labels = c("No", "Yes"))
+  )
+```
+
+```{r}
+# Replacing empty strings with NA
+healthyaging_clean[healthyaging_clean == ""] <- NA
+
+# Imputing missing values with median or mode as appropriate
+healthyaging_clean <- healthyaging_clean %>%
+  mutate_if(is.character, ~replace(., is.na(.), "Unknown")) %>%
+  mutate_if(is.numeric, ~replace(., is.na(.), median(., na.rm = TRUE)))
+```
+
+**Data Pre-Processing**:
+
+The dataset underwent careful cleaning and pre-processing to ensure that all columns were readable and easy to interpret. Variables like "Number of Doctors Visited" were transformed into categorical factors with clear labels for categories like "0-1 doctors" or "4 or more doctors." Similarly, other variables like "Physical Health" and "Mental Health" were converted to factors with labeled categories ranging from "Excellent" to "Poor." The cleaning process involved handling any missing values by replacing them with appropriate median or mode values, ensuring a cleaner dataset ready for analysis.
+
+**Column Renaming for Clarity**:
+
+To enhance readability, column names were adjusted to remove underscores and improve clarity. For instance, "Number_of_Doctors_Visited" was renamed to "Doctors Visited," while "Stress_Keeps_Patient_from_Sleeping" was simplified to "Stress Impact." This adjustment improves the overall user experience when working with the dataset and aligns with best practices for data reporting, making the dataset more understandable for analysis and interpretation.
+
+**Handling Missing Values**:
+
+We addressed missing values by replacing any empty strings with NA to ensure proper handling. For categorical variables, missing values were replaced with "Unknown," ensuring that the integrity of categorical groupings was maintained. For numeric variables, missing values were imputed using the median of the available data to avoid skewing the results. This approach ensures that the dataset remains robust for analysis without introducing bias or distorting the distribution of variables.
+
+
+# Data Analysis
+
+## Distribution of Number of Doctors Visited
+```{r}
+p1 <- ggplot(healthyaging_clean, aes(x = `Doctors Visited`)) +
+  geom_bar(fill = "#005ea2", color = "black") +
+  labs(title = "Distribution of Number of Doctors Visited",
+       x = "Number of Doctors Visited",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        text = element_text(size = 12))
+
+p1_ggplotly <- ggplotly(p1, tooltip = c("x", "y"))
+
+p1_ggplotly %>%
+  layout(
+    hoverlabel = list(
+      bgcolor = "white", 
+      font = list(size = 12)
+    ),
+    hovermode = "closest",
+    xaxis = list(title = "Number of Doctors Visited"),
+    yaxis = list(title = "Frequency"),
+    annotations = list(
+      list(
+        text = "Each bar represents the number of respondents who visited a certain number of doctors.",
+        xref = "paper", yref = "paper",
+        x = 0.5, y = 1.1, showarrow = FALSE,
+        font = list(size = 12, color = "black")
+      )
+    )
+  )
+```
+
+The bar chart displays the distribution of survey respondents based on the number of doctors they visited. The categories are broken down as follows: 0-1 doctors, 2-3 doctors, and 4 or more doctors.
+
+**Observations**:
+
+1. Majority Group (2-3 doctors): 
+
+The largest group of respondents (372 individuals) visited 2-3 doctors. This indicates that most older adults in the sample required multiple healthcare consultations within a certain period, likely due to the variety and complexity of their health conditions. This suggests that older adults often see several specialists or follow up with their primary care physicians regularly.
+
+2. Smaller Groups: 
+
+Around 120 individuals saw either 0-1 doctors, potentially reflecting those in better health or facing barriers to accessing healthcare. Approximately 200 respondents visited 4 or more doctors, which might indicate those managing chronic or multiple conditions, requiring frequent medical attention.
+
+**Insights**:
+
+1. High Medical Visit Frequency: 
+
+- The high number of visits to doctors, particularly the 2-3 range, implies a complex healthcare landscape for the elderly population. This is consistent with the typical healthcare needs of older adults, who often deal with multiple chronic conditions such as cardiovascular disease, diabetes, or arthritis, each requiring specific medical attention.
+
+2. Access to and Utilization of Healthcare: 
+
+- The data suggests a strong reliance on healthcare services among older adults, but it also raises questions about the quality of care coordination. The group that saw 4 or more doctors highlights the possibility of fragmented care, as they may visit multiple providers without adequate communication or continuity of care.
+
+**Recommendation**:
+
+1. Coordinated Care Systems: 
+
+- Given that a significant portion of respondents visit multiple doctors, healthcare systems need to implement stronger care coordination efforts. This can prevent overlapping treatments or conflicting advice from various providers. Healthcare information systems, such as electronic health records (EHRs), should be integrated and shared among providers to ensure consistency in treatment.
+
+2. Improving Access and Equity: 
+
+- For the group visiting fewer doctors, targeted interventions could be necessary to ensure that these individuals are not underutilizing healthcare due to barriers such as transportation, financial constraints, or lack of access to specialists.
+
+3. Preventive and Specialized Programs: 
+
+- As the aging population faces diverse and complex health issues, specialized programs for managing chronic diseases and preventive care can help reduce the need for frequent doctor visits. Education on self-management of conditions, routine check-ups, and lifestyle interventions should be emphasized in public health strategies to improve overall well-being and potentially reduce the reliance on frequent medical visits.
+
+The distribution of doctor visits reflects the varied healthcare needs of the aging population. Strategies for better care coordination and equitable access to healthcare are essential to ensuring optimal health outcomes for older adults.
+
+
+## 3.2 Physical Health Category
+```{r}
+p2 <- ggplot(healthyaging_clean, aes(x = `Physical Health`)) +
+  geom_bar(fill = "#005ea2", color = "black") +
+  labs(title = "Physical Health Category in Older Adults",
+       x = "Physical Health",
+       y = "Frequency") +
+  theme_light() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        text = element_text(size = 12))
+
+p2_ggplotly <- ggplotly(p2, tooltip = c("x", "y"))
+
+p2_ggplotly %>%
+  layout(
+    hoverlabel = list(
+      bgcolor = "white", 
+      font = list(size = 12)
+    ),
+    hovermode = "closest",
+    xaxis = list(title = "Physical Health Category"),
+    yaxis = list(title = "Frequency"),
+    annotations = list(
+      list(
+        text = "Bar heights indicate the number of respondents reporting each category of physical health.",
+        xref = "paper", yref = "paper",
+        x = 0.5, y = 1.1, showarrow = FALSE,
+        font = list(size = 12, color = "black")
+      )
+    )
+  )
+```
+
+This bar chart provides a clear representation of self-reported physical health among older adults. Most respondents classify their health as "Good" or "Very Good," with approximately 280 and 230 individuals, respectively, in these categories. Conversely, smaller numbers report "Fair" (120) and "Poor" (approximately 20) health. The "Excellent" category is notably underrepresented, with fewer than 50 respondents, while very few opted to not provide a response ("Refused").
+
+**Key Insights**:
+
+1.Positive Health Perception: 
+
+The majority of older adults surveyed view their physical health positively, with 70% rating it as either "Good" or "Very Good." This indicates a generally favorable perception of physical health among the aging population, which is promising.
+
+2. Areas of Concern: 
+
+However, around 20% rate their health as "Fair" or "Poor," signifying the presence of underlying health challenges or chronic conditions that require attention and intervention.
+
+**Possible Reasons Behind the Observations**:
+
+1. Positive Perception of Health: 
+
+Older adults rating their health as "Good" or "Very Good" could indicate the success of healthy aging initiatives, regular medical checkups, and a focus on fitness and preventive care.
+
+2. Fair/Poor Health Indication: 
+
+The 20% of respondents who reported "Fair" or "Poor" health might be dealing with chronic diseases or physical limitations that impede their overall health.
+
+**Recommendations**:
+
+1. Tailored Healthcare Programs: 
+
+To sustain or improve physical health, healthcare providers should continue offering programs that focus on healthy aging, including regular checkups, physical fitness programs, and preventive healthcare services.
+
+2. Intervention for Fair/Poor Health: 
+
+Special focus should be directed toward the group reporting "Fair" or "Poor" health. Programs that emphasize chronic disease management, rehabilitation, and wellness interventions may improve their quality of life and reduce health disparities among older adults.
+
+3. Promotion of Preventive Health: 
+
+Public health campaigns should emphasize the importance of maintaining physical activity, balanced nutrition, and preventive healthcare among older adults to promote long-term well-being.
+
+
+## 3.3 Impact of Pain on Sleep
+```{r}
+p3 <- ggplot(healthyaging_clean, aes(x = `Pain Impact`)) +
+  geom_bar(fill = "#1a4480", color = "black") +
+  labs(title = "Impact of Pain on Sleep in Older Adults",
+       x = "Pain Keeps Patient from Sleeping",
+       y = "Frequency") +
+  theme_light() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        text = element_text(size = 12))
+
+p3_ggplotly <- ggplotly(p3, tooltip = c("x", "y"))
+
+p3_ggplotly %>%
+  layout(
+    hoverlabel = list(
+      bgcolor = "white", 
+      font = list(size = 12)
+    ),
+    hovermode = "closest",
+    xaxis = list(title = "Pain Keeps Patient from Sleeping"),
+    yaxis = list(title = "Frequency"),
+    annotations = list(
+      list(
+        text = "Hover over each bar to see how many respondents report pain affecting sleep.",
+        xref = "paper", yref = "paper",
+        x = 0.5, y = 1.1, showarrow = FALSE,
+        font = list(size = 12, color = "black")
+      )
+    )
+  )
+```
+
+This bar chart visualizes the impact of pain on sleep among older adults. The data reveals a significant difference in how pain affects sleep. A substantial majority of respondents report that pain does not interfere with their sleep, while a smaller but notable portion states that pain disrupts their sleep.
+
+**Observations**:
+
+- Pain and Sleep Disruption: Over 400 respondents reported that pain does not keep them from sleeping, while just over 100 respondents indicated that pain does disturb their sleep.
+
+**Insights**:
+
+1. Prevalence of Chronic Pain: 
+
+Though a majority of older adults are not experiencing sleep disruption due to pain, the significant number of those who do underscores the prevalence of chronic pain issues in this population.
+
+2. Implications for Sleep Quality: 
+
+Chronic pain is clearly a critical factor that negatively impacts sleep for a subset of respondents, which may lead to further health complications like fatigue and reduced overall quality of life.
+
+**Recommendations**:
+
+1. Pain Management Programs: 
+
+Healthcare providers should prioritize the management of chronic pain to improve sleep quality among older adults. Regular assessments and personalized care plans should be implemented to reduce the impact of pain on daily functioning.
+
+2. Sleep Interventions: 
+
+Integrative approaches combining pain relief with sleep improvement strategies, such as cognitive behavioral therapy for insomnia (CBT-I) or physical therapy, may be beneficial for this group of older adults.
+
+This analysis demonstrates the need for targeted interventions aimed at alleviating pain to ensure improved sleep quality in older adults, enhancing overall well-being and preventing further health complications.
+
+
+## 3.4 Employment Status Distribution
+```{r}
+p4 <- ggplot(healthyaging_clean, aes(x = `Employment Status`)) +
+  geom_bar(fill = "#face00", color = "black") +
+  labs(title = "Employment Status Distribution in Older Adults",
+       x = "Employment Status",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        text = element_text(size = 12))
+
+p4_ggplotly <- ggplotly(p4, tooltip = c("x", "y"))
+
+p4_ggplotly %>%
+  layout(
+    hoverlabel = list(
+      bgcolor = "white", 
+      font = list(size = 12)
+    ),
+    hovermode = "closest",
+    xaxis = list(title = "Employment Status"),
+    yaxis = list(title = "Frequency"),
+    annotations = list(
+      list(
+        text = "This chart shows the employment distribution among older adults.",
+        xref = "paper", yref = "paper",
+        x = 0.5, y = 1.1, showarrow = FALSE,
+        font = list(size = 12, color = "black")
+      )
+    )
+  )
+```
+
+This bar chart presents the distribution of employment status among older adults aged 65 to 80. The data shows significant variation, with some distinct trends.
+
+**Observations**:
+
+1. Retired: A clear majority of respondents reported being retired, with approximately 600 individuals falling into this category.
+
+2. Working Part-Time: A moderate number of respondents are working part-time, representing a notable proportion of the older population.
+
+3. Working Full-Time: A small percentage of respondents are still engaged in full-time employment, although this group is relatively minor in size.
+
+4. Not Working: A very small proportion of individuals reported not being employed at this time.
+
+**Insights**:
+
+1. Retirement Dominates: 
+
+The high number of retired respondents is unsurprising given the age group, indicating a shift away from formal employment as individuals age.
+
+2. Part-Time Work: 
+
+Part-time employment reflects older adults' desire or necessity to remain active in the workforce while enjoying flexibility.
+
+3. Low Full-Time Employment: 
+
+The low proportion of full-time workers may reflect the difficulties and challenges of maintaining full-time employment in this age group due to health or lifestyle preferences.
+
+**Recommendations**:
+
+1. Retirement Planning and Security: 
+
+As most respondents are retired, it underscores the importance of ensuring financial security for this demographic. Robust retirement planning programs can aid in addressing their needs.
+
+2. Encouraging Part-Time Opportunities: 
+
+Policymakers and employers should focus on creating flexible, part-time work opportunities that cater to older adults who still wish to contribute but may not be able to work full-time.
+
+3. Community Engagement: 
+
+For the retired population, programs offering social interaction, volunteer work, and hobbies are essential to ensure they remain active, connected, and have a sense of purpose in their retirement years.
+
+
+## 3.5 Impact of Stress and Medication on Sleep
+```{r}
+p5 <- ggplot(healthyaging_clean, aes(x = `Stress Impact`, fill = `Medication Impact`)) +
+  geom_bar(position = "dodge", color = "black") +
+  labs(title = "Impact of Stress and Medication on Sleep",
+       x = "Stress Keeps Patient from Sleeping",
+       y = "Frequency",
+       fill = "Medication Keeps Patient from Sleeping") +
+  theme_light() +
+  scale_fill_manual(values = c("No" = "#face00", "Yes" = "#e5a000")) +
+  theme(plot.title = element_text(hjust = 0.5, size = 14),
+        axis.title.x = element_text(margin = margin(t = 15), size = 12),
+        axis.title.y = element_text(margin = margin(r = 15), size = 12),
+        text = element_text(size = 12))
+
+p5_ggplotly <- ggplotly(p5, tooltip = c("x", "fill"))
+
+p5_ggplotly %>%
+  layout(
+    hoverlabel = list(
+      bgcolor = "white", 
+      font = list(size = 12)
+    ),
+    hovermode = "closest",
+    title = list(text = "<br>Impact of Stress and Medication on Sleep", x = 0.5),
+    annotations = list(
+      list(
+        text = "Hover over each bar to see the number of respondents affected by stress and medication.",
+        xref = "paper", yref = "paper",
+        x = 0.5, y = 1.1, showarrow = FALSE,
+        font = list(size = 12, color = "black")
+      )
+    )
+  )
+```
+
+The bar chart visualizes the relationship between stress, medication, and their effect on sleep among older adults. The following observations can be made:
+
+**Observations**:
+
+- A substantial number of respondents report that stress does not keep them from sleeping, with over 500 respondents indicating this.
+
+- However, a notable proportion of respondents (around 150 individuals) do indicate that stress does affect their sleep.
+
+- For those affected by stress, medication is also less likely to impact their sleep, as represented by the "No" category dominating both groups.
+
+**Insights**:
+
+1. Stress Impact: 
+
+Stress plays a significant role in disrupting sleep for some older adults, though a majority are not affected.
+
+2. Medication Impact: 
+
+While stress is impactful, medication is not seen as a primary factor affecting sleep in this group, with most respondents reporting that their medication does not interfere with sleep.
+
+**Recommendations**:
+
+1. Mental Health Services: 
+
+Introducing or enhancing mental health support systems could benefit those affected by stress-induced sleep issues, offering therapeutic solutions like counseling or stress-management programs.
+
+2. Sleep Medication Management: 
+
+For respondents whose sleep is impacted by medication, healthcare providers should conduct periodic reviews of prescribed medications to minimize any adverse effects on sleep quality.
+
+
+## 3.6 Dental Health Category
+```{r}
+p6 <- ggplot(healthyaging_clean, aes(x = `Dental Health`)) +
+  geom_bar(fill = "#e5a000", color = "black") +
+  labs(title = "Dental Health Category in Older Adults",
+       x = "Dental Health",
+       y = "Frequency") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        text = element_text(size = 12))
+
+# Adding interactive tooltips to the plot
+p6_ggplotly <- ggplotly(p6, tooltip = c("x", "y"))
+
+p6_ggplotly %>%
+  layout(
+    hoverlabel = list(
+      bgcolor = "white", 
+      font = list(size = 12)
+    ),
+    hovermode = "closest",
+    xaxis = list(title = "Dental Health"),
+    yaxis = list(title = "Frequency"),
+    annotations = list(
+      list(
+        text = "This chart shows the distribution of dental health ratings among older adults.",
+        xref = "paper", yref = "paper",
+        x = 0.5, y = 1.1, showarrow = FALSE,
+        font = list(size = 12, color = "black")
+      )
+    )
+  )
+```
+
+The bar chart illustrates the distribution of self-reported dental health among older adults across several categories.
+
+**Observations**:
+
+1. Very Good and Good: 
+The largest groups of respondents rated their dental health as "Very Good" or "Good," collectively accounting for a significant portion of the sample.
+
+2. Fair and Poor: A substantial number of respondents reported having "Fair" or "Poor" dental health.
+
+3. Excellent and Refused: A small group of respondents rated their health as "Excellent" or refused to provide their status.
+
+**Insights**:
+
+1. Mixed Self-Assessments: 
+
+There is a wide range of perceived dental health statuses among older adults. While a majority rate their health positively (Good or Very Good), a significant portion indicates poorer health, highlighting disparities in oral health.
+
+2. Access and Utilization Gaps: 
+
+These mixed assessments suggest varying levels of access to or utilization of dental care services among older adults, particularly as a notable percentage report "Fair" or "Poor" dental health.
+
+**Recommendations**:
+
+1. Increase Access to Dental Services: 
+
+Policies aimed at increasing the affordability and availability of dental care for older adults would likely improve dental health outcomes, especially for those reporting Fair or Poor health.
+
+2. Preventive Care: 
+
+Initiatives that emphasize preventive dental care could help reduce the number of older adults reporting poorer oral health, improving overall well-being.
+
+
+# Conclusion
+
+The analysis of the National Poll on Healthy Aging reveals critical insights into the health and well-being of older adults, particularly those aged 50-80. The data highlights the following key themes:
+
+1. Healthcare Access and Doctor Visits: 
+
+Most older adults are engaged in healthcare services, visiting multiple doctors, with a small portion having limited access. Ensuring coordinated and comprehensive healthcare is essential to meet their complex needs.
+
+2 Physical and Mental Health: 
+
+While many respondents report positive physical and mental health, a significant portion experiences fair to poor health. This indicates the need for targeted interventions to improve overall well-being.
+
+3. Pain and Sleep Disruptions: 
+
+Chronic pain affects sleep for many older adults, underscoring the importance of effective pain management programs. Addressing sleep quality through integrative care can significantly enhance life quality in aging populations.
+
+4. Employment Status and Retirement: 
+
+Retirement is prevalent, but there is still a considerable group of older adults working part-time or full-time. Policies that support flexible work arrangements and ensure financial security for retirees are vital.
+
+5. Stress and Medication on Sleep: 
+
+Stress and certain medications impact sleep for a notable number of respondents, pointing to the importance of mental health services and careful medication management.
+
+6. Dental Health Disparities: 
+
+The varying levels of dental health emphasize disparities in access to dental care, with many respondents reporting fair to poor dental health. Expanding dental services and implementing preventive care programs could address these disparities.
+
+
+# Future Actions and Research Areas
+
+1. Coordinated Healthcare Programs: 
+
+Research should explore models for coordinated care that reduce fragmentation in medical treatment and optimize outcomes for older adults with multiple healthcare needs.
+
+2. Chronic Disease and Pain Management: 
+
+Future research and policy should focus on expanding pain management services, integrating physical therapy, and providing better chronic disease management options tailored to older adults.
+
+3. Mental Health and Stress Management: 
+
+Expanding mental health services within primary care settings, particularly for managing stress and improving sleep, could enhance the quality of life for older adults.
+
+4. Retirement Support: 
+
+Investigating the long-term financial security of retirees and policies that offer flexible working conditions for those who wish to remain active will be essential in future studies.
+
+5. Improved Dental Care Access: 
+
+Exploring policies that provide affordable and comprehensive dental care for older adults, especially preventive care initiatives, will reduce disparities in oral health.
+
+# Reference
+https://archive.ics.uci.edu/dataset/936/national+poll+on+healthy+aging+(npha)
